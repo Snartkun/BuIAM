@@ -3,17 +3,16 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from app.delegation.capabilities import intersect_capabilities, parse_capabilities
-from app.identity.mock_store import blacklist, get_target_agent_caps, get_user_caps, jti_seen
-from app.identity.mock_token import verify_sig, verify_token_source
 from app.protocol import DelegationDecision, DelegationEnvelope, DelegationHop
 from app.store.audit import record_decision
+from app.store.registry import get_agent
 
 
 class DelegationService:
     def authorize(self, envelope: DelegationEnvelope) -> DelegationDecision:
         requested_for_error = sorted(envelope.requested_capabilities)
-        target_caps = get_target_agent_caps(envelope.target_agent_id)
-        if target_caps is None:
+        target_agent = get_agent(envelope.target_agent_id)
+        if target_agent is None:
             return DelegationDecision(
                 decision="deny",
                 reason=f"unknown target agent: {envelope.target_agent_id}",
@@ -22,29 +21,12 @@ class DelegationService:
                 requested_capabilities=requested_for_error,
             )
 
+        target_caps = target_agent.static_capabilities
         auth_context = envelope.auth_context
-        if auth_context.jti in blacklist:
+        if auth_context is None:
             return DelegationDecision(
                 decision="deny",
-                reason=f"token jti has been revoked: {auth_context.jti}",
-                effective_capabilities=[],
-                missing_capabilities=requested_for_error,
-                requested_capabilities=requested_for_error,
-            )
-        jti_seen.add(auth_context.jti)
-
-        if not verify_token_source(auth_context):
-            return DelegationDecision(
-                decision="deny",
-                reason="token source verification failed",
-                effective_capabilities=[],
-                missing_capabilities=requested_for_error,
-                requested_capabilities=requested_for_error,
-            )
-        if not verify_sig(auth_context):
-            return DelegationDecision(
-                decision="deny",
-                reason="token signature verification failed",
+                reason="missing trusted auth context",
                 effective_capabilities=[],
                 missing_capabilities=requested_for_error,
                 requested_capabilities=requested_for_error,
@@ -68,15 +50,7 @@ class DelegationService:
                 requested_capabilities=requested_for_error,
             )
 
-        delegated_user_caps = get_user_caps(auth_context.delegated_user)
-        if delegated_user_caps is None:
-            return DelegationDecision(
-                decision="deny",
-                reason=f"unknown delegated user: {auth_context.delegated_user}",
-                effective_capabilities=[],
-                missing_capabilities=requested_for_error,
-                requested_capabilities=requested_for_error,
-            )
+        delegated_user_caps = set(auth_context.capabilities)
 
         try:
             requested = parse_capabilities(envelope.requested_capabilities)

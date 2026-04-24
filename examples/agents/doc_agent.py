@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from app.delegation.client import delegation_client
-from app.llm.client import get_llm_provider
 from app.protocol import AgentTaskResponse, DelegationEnvelope
+from examples.llm.client import get_llm_provider
 
 
 AGENT_ID = "doc_agent"

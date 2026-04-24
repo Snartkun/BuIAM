@@ -46,6 +46,7 @@ class AuthContext(BaseModel):
 
 
 class DelegationEnvelope(BaseModel):
+    protocol_version: str = "buiam.delegation.v1"
     trace_id: str
     request_id: str
     caller_agent_id: str
@@ -53,7 +54,7 @@ class DelegationEnvelope(BaseModel):
     task_type: str
     requested_capabilities: list[str] = Field(default_factory=list)
     delegation_chain: list[DelegationHop] = Field(default_factory=list)
-    auth_context: AuthContext
+    auth_context: AuthContext | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -104,6 +105,19 @@ class AuditLog(BaseModel):
     effective_capabilities: list[str]
     decision: str
     reason: str
-    delegation_chain: list[dict[str, Any]]
     decision_detail: dict[str, Any] = Field(default_factory=dict)
     created_at: str
+
+
+class AgentRegistrationRequest(BaseModel):
+    agent_id: str
+    name: str
+    endpoint: str
+    static_capabilities: list[str] = Field(default_factory=list)
+
+
+class TokenIssueRequest(BaseModel):
+    agent_id: str
+    delegated_user: str = "user_123"
+    capabilities: list[str] = Field(default_factory=list)
+    ttl_seconds: int = 3600

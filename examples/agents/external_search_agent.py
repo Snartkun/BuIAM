@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.delegation.client import delegation_client
 from app.protocol import AgentTaskResponse, DelegationEnvelope
-from app.tools.web import search_public_web
+from examples.tools.web import search_public_web
 
 
 AGENT_ID = "external_search_agent"

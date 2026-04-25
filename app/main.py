@@ -6,6 +6,7 @@ from app.gateway.routes import router as gateway_router
 from app.identity.routes import router as identity_router
 from app.registry.routes import router as registry_router
 from app.store.audit import list_logs
+from app.store.auth_events import list_auth_events
 from app.store.chain import list_chain
 from app.store.schema import init_schema
 
@@ -31,9 +32,31 @@ def audit_logs():
     return list_logs()
 
 
+@app.get("/audit/auth-events")
+def audit_auth_events(
+    trace_id: str | None = None,
+    request_id: str | None = None,
+    jti: str | None = None,
+    agent_id: str | None = None,
+    decision: str | None = None,
+):
+    return list_auth_events(
+        trace_id=trace_id,
+        request_id=request_id,
+        jti=jti,
+        agent_id=agent_id,
+        decision=decision,
+    )
+
+
 @app.get("/audit/traces/{trace_id}")
 def audit_trace(trace_id: str):
-    return {"trace_id": trace_id, "logs": list_logs(trace_id=trace_id), "chain": list_chain(trace_id)}
+    return {
+        "trace_id": trace_id,
+        "logs": list_logs(trace_id=trace_id),
+        "chain": list_chain(trace_id),
+        "auth_events": list_auth_events(trace_id=trace_id),
+    }
 
 
 @app.get("/audit/traces/{trace_id}/chain")

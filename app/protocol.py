@@ -31,6 +31,9 @@ class DecisionDetail(BaseModel):
     effective_capabilities: list[str] = Field(default_factory=list)
     missing_capabilities: list[str] = Field(default_factory=list)
     missing_by: dict[str, list[str]] = Field(default_factory=dict)
+    auth_event_recorded: bool = False
+    token_jti: str | None = None
+    token_agent_id: str | None = None
     decision: Literal["allow", "deny"]
     reason: str
 
@@ -90,6 +93,7 @@ class DelegationDecision(BaseModel):
             effective_capabilities=self.effective_capabilities,
             missing_capabilities=self.missing_capabilities,
             missing_by=self.missing_by,
+            auth_event_recorded=False,
             decision=self.decision,
             reason=self.reason,
         )
@@ -106,6 +110,32 @@ class AuditLog(BaseModel):
     decision: str
     reason: str
     decision_detail: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+
+
+class AuthEvent(BaseModel):
+    id: int
+    trace_id: str
+    request_id: str
+    caller_agent_id: str | None = None
+    claimed_agent_id: str | None = None
+    token_jti: str | None = None
+    token_sub: str | None = None
+    token_agent_id: str | None = None
+    delegated_user: str | None = None
+    token_fingerprint: str | None = None
+    token_issued_at: int | None = None
+    token_expires_at: int | None = None
+    verified_at: int
+    is_expired: bool | None = None
+    is_revoked: bool | None = None
+    is_jti_registered: bool | None = None
+    signature_valid: bool | None = None
+    issuer_valid: bool | None = None
+    audience_valid: bool | None = None
+    identity_decision: Literal["allow", "deny"]
+    error_code: str | None = None
+    reason: str
     created_at: str
 
 

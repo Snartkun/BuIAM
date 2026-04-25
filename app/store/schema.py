@@ -100,3 +100,32 @@ def init_schema(db_path: Path = DB_PATH) -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trace_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                caller_agent_id TEXT,
+                claimed_agent_id TEXT,
+                token_jti TEXT,
+                token_sub TEXT,
+                token_agent_id TEXT,
+                delegated_user TEXT,
+                token_fingerprint TEXT,
+                token_issued_at INTEGER,
+                token_expires_at INTEGER,
+                verified_at INTEGER NOT NULL,
+                is_expired INTEGER,
+                is_revoked INTEGER,
+                is_jti_registered INTEGER,
+                signature_valid INTEGER,
+                issuer_valid INTEGER,
+                audience_valid INTEGER,
+                identity_decision TEXT NOT NULL,
+                error_code TEXT,
+                reason TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )

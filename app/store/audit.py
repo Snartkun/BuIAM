@@ -58,7 +58,7 @@ def record_decision(
                 decision.decision,
                 decision.reason,
                 "[]",
-                decision.to_detail().model_dump_json(),
+                decision_detail_json(envelope, decision),
             ),
         )
 
@@ -105,3 +105,11 @@ def delegation_decision_hop(envelope: DelegationEnvelope, decision: DelegationDe
         missing_capabilities=decision.missing_capabilities,
         decision=decision.decision,
     )
+
+
+def decision_detail_json(envelope: DelegationEnvelope, decision: DelegationDecision) -> str:
+    detail = decision.to_detail().model_dump()
+    detail["auth_event_recorded"] = envelope.auth_context is not None
+    detail["token_jti"] = envelope.auth_context.jti if envelope.auth_context is not None else None
+    detail["token_agent_id"] = envelope.auth_context.agent_id if envelope.auth_context is not None else None
+    return json.dumps(detail, ensure_ascii=False)

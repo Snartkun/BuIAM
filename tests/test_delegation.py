@@ -334,8 +334,92 @@ def test_audit_logs_include_decision_detail() -> None:
     trace = client.get(f"/audit/traces/{trace_id}").json()
     all_logs = client.get("/audit/logs").json()
     assert trace["logs"][-1]["decision_detail"]["decision"] == "allow"
+    assert trace["logs"][-1]["decision_detail"]["auth_event_recorded"] is True
+    assert trace["auth_events"][-1]["identity_decision"] == "allow"
+    assert trace["auth_events"][-1]["token_fingerprint"]
+    assert "access_token" not in trace["auth_events"][-1]
     assert trace["chain"]
     assert any(log.get("decision_detail") for log in all_logs)
+
+
+def test_missing_authorization_is_recorded_as_auth_event() -> None:
+    client = TestClient(app)
+    on_startup()
+    register_demo_agents()
+    trace_id = f"trace_auth_missing_{uuid4()}"
+    request_id = f"req_auth_missing_{uuid4()}"
+    response = client.post(
+        "/delegate/call",
+        json=DelegationEnvelope(
+            trace_id=trace_id,
+            request_id=request_id,
+            caller_agent_id="doc_agent",
+            target_agent_id="enterprise_data_agent",
+            task_type="read_enterprise_data",
+            requested_capabilities=["feishu.wiki:read"],
+            payload={},
+        ).model_dump(),
+    )
+    assert response.status_code == 401
+    auth_events = client.get(f"/audit/auth-events?trace_id={trace_id}").json()
+    assert auth_events[-1]["request_id"] == request_id
+    assert auth_events[-1]["identity_decision"] == "deny"
+    assert auth_events[-1]["error_code"] == "AUTH_TOKEN_MISSING"
+
+
+def test_revoked_token_is_recorded_as_auth_event() -> None:
+    client = TestClient(app)
+    on_startup()
+    register_demo_agents()
+    issued = issue_token(
+        agent_id="doc_agent",
+        delegated_user="user_123",
+        capabilities=["feishu.wiki:read"],
+    )
+    assert revoke_token(issued["jti"])
+    trace_id = f"trace_auth_revoked_{uuid4()}"
+    response = client.post(
+        "/delegate/call",
+        headers={"Authorization": f"Bearer {issued['access_token']}"},
+        json=DelegationEnvelope(
+            trace_id=trace_id,
+            request_id=f"req_auth_revoked_{uuid4()}",
+            caller_agent_id="doc_agent",
+            target_agent_id="enterprise_data_agent",
+            task_type="read_enterprise_data",
+            requested_capabilities=["feishu.wiki:read"],
+            payload={},
+        ).model_dump(),
+    )
+    assert response.status_code == 401
+    auth_event = client.get(f"/audit/auth-events?trace_id={trace_id}").json()[-1]
+    assert auth_event["identity_decision"] == "deny"
+    assert auth_event["error_code"] == "AUTH_TOKEN_REVOKED"
+    assert auth_event["is_revoked"] is True
+
+
+def test_malformed_token_is_recorded_as_auth_event() -> None:
+    client = TestClient(app)
+    on_startup()
+    register_demo_agents()
+    trace_id = f"trace_auth_malformed_{uuid4()}"
+    response = client.post(
+        "/delegate/call",
+        headers={"Authorization": "Bearer not-a-jwt"},
+        json=DelegationEnvelope(
+            trace_id=trace_id,
+            request_id=f"req_auth_malformed_{uuid4()}",
+            caller_agent_id="doc_agent",
+            target_agent_id="enterprise_data_agent",
+            task_type="read_enterprise_data",
+            requested_capabilities=["feishu.wiki:read"],
+            payload={},
+        ).model_dump(),
+    )
+    assert response.status_code == 401
+    auth_event = client.get(f"/audit/auth-events?trace_id={trace_id}").json()[-1]
+    assert auth_event["identity_decision"] == "deny"
+    assert auth_event["error_code"] == "AUTH_TOKEN_MALFORMED"
 
 
 def test_app_core_does_not_import_examples_except_local_adapter() -> None:

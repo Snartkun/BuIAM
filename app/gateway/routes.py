@@ -6,7 +6,8 @@ import httpx
 from app.delegation.service import delegation_service, raise_for_denied
 from app.gateway.local_adapter import call_local_agent
 from app.identity.jwt_service import TokenError, verify_token
-from app.protocol import AgentTaskResponse, DelegationEnvelope
+from app.protocol import AgentTaskResponse, DelegationDecision, DelegationEnvelope
+from app.store.audit import record_decision
 from app.store.registry import get_agent
 
 
@@ -60,7 +61,22 @@ async def delegate_call(
         trusted_envelope,
         decision.effective_capabilities,
     )
-    return await forward_to_agent(target.endpoint, authorized_envelope)
+
+    try:
+        return await forward_to_agent(target.endpoint, authorized_envelope)
+    except HTTPException as error:
+        forward_error_decision = DelegationDecision(
+            decision="deny",
+            reason=f"target agent unreachable or returned error: {error.detail}",
+            effective_capabilities=decision.effective_capabilities,
+            missing_capabilities=[],
+            requested_capabilities=decision.requested_capabilities,
+            caller_token_capabilities=decision.caller_token_capabilities,
+            target_agent_capabilities=decision.target_agent_capabilities,
+            user_capabilities=decision.user_capabilities,
+        )
+        record_decision(trusted_envelope, forward_error_decision)
+        raise
 
 
 async def forward_to_agent(endpoint: str, envelope: DelegationEnvelope) -> AgentTaskResponse:

@@ -20,6 +20,7 @@ def record_decision(
     db_path: Path = DB_PATH,
 ) -> None:
     init_db(db_path)
+    current_hop = delegation_decision_hop(envelope, decision)
     append_chain_hops_if_empty(
         trace_id=envelope.trace_id,
         request_id=envelope.request_id,
@@ -29,9 +30,11 @@ def record_decision(
     append_chain_hop(
         trace_id=envelope.trace_id,
         request_id=envelope.request_id,
-        hop=delegation_decision_hop(envelope, decision),
+        hop=current_hop,
         db_path=db_path,
     )
+    full_chain = list(envelope.delegation_chain) + [current_hop]
+    chain_json = json.dumps([h.model_dump() for h in full_chain], ensure_ascii=False)
     with sqlite3.connect(db_path) as connection:
         connection.execute(
             """
@@ -57,7 +60,7 @@ def record_decision(
                 json.dumps(decision.effective_capabilities, ensure_ascii=False),
                 decision.decision,
                 decision.reason,
-                "[]",
+                chain_json,
                 decision.to_detail().model_dump_json(),
             ),
         )
